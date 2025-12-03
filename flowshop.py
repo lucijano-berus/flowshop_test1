@@ -19,8 +19,10 @@ from pymoo.algorithms.moo.moead import MOEAD
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.moo.nsga3 import NSGA3
 from pymoo.core.problem import ElementwiseProblem
-from pymoo.factory import get_crossover, get_mutation, get_sampling
 from pymoo.optimize import minimize
+from pymoo.operators.crossover.pmx import PMX
+from pymoo.operators.mutation.inversion import InversionMutation
+from pymoo.operators.sampling.rnd import PermutationRandomSampling
 from pymoo.termination import get_termination
 from pymoo.util.ref_dirs import get_reference_directions
 
@@ -37,8 +39,8 @@ def load_jobs(path: Path) -> pd.DataFrame:
     """Load the job routing table from a TSV file and normalize decimals."""
 
     df = pd.read_csv(path, sep="\t")
-    df["tanTotalTime"] = (
-        df["tanTotalTime"].astype(str).str.replace(",", ".", regex=False).astype(float)
+    df["anTotalTime"] = (
+        df["anTotalTime"].astype(str).str.replace(",", ".", regex=False).astype(float)
     )
     return df
 
@@ -56,7 +58,7 @@ def build_processing_matrix(
         job_idx = job_ids.index(row.acKey)
         if row.acIdent not in machine_index:
             raise ValueError(f"Unknown machine '{row.acIdent}' in input data")
-        processing[job_idx, machine_index[row.acIdent]] = row.tanTotalTime
+        processing[job_idx, machine_index[row.acIdent]] = row.anTotalTime
 
     return job_ids, processing
 
@@ -118,9 +120,9 @@ def configure_algorithms(problem: FlowShopProblem) -> Dict[str, object]:
     """Instantiate three pymoo algorithms suited for permutation problems."""
 
     pop_size = 60
-    sampling = get_sampling("perm_random")
-    crossover = get_crossover("perm_pmx")
-    mutation = get_mutation("perm_mutation")
+    sampling = PermutationRandomSampling()
+    crossover = PMX()
+    mutation = InversionMutation()
 
     ref_dirs = get_reference_directions("das-dennis", problem.n_obj, n_partitions=12)
 
