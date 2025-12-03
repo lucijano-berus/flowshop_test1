@@ -54,6 +54,12 @@ class PMXCrossover(Crossover):
 
     def _do(self, problem, X, **kwargs):
         # X has shape (n_matings, 2, n_var)
+        if X.shape[1] < 2:
+            # Some algorithms (e.g., single-parent reproduction steps) may call the
+            # crossover with only one parent. In that case, just pass the parent
+            # through unchanged to satisfy the expected shape without failing.
+            return X.copy()
+
         n_matings, _, n_var = X.shape
         children = np.empty_like(X)
 
