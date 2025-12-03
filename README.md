@@ -22,3 +22,8 @@ and uses comma decimals, which are normalized automatically by the script.
 
 The console output lists the objective values for each algorithm, reports the
 best makespan that was found, and tells you where the image was saved.
+
+The script includes lightweight PMX crossover, inversion mutation, and
+permutation sampling operators implemented inline to avoid version-specific
+imports from pymoo, so it should run regardless of the pymoo release you have
+installed.

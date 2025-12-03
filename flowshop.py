@@ -18,11 +18,11 @@ import pandas as pd
 from pymoo.algorithms.moo.moead import MOEAD
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.moo.nsga3 import NSGA3
+from pymoo.core.crossover import Crossover
+from pymoo.core.mutation import Mutation
 from pymoo.core.problem import ElementwiseProblem
+from pymoo.core.sampling import Sampling
 from pymoo.optimize import minimize
-from pymoo.operators.crossover.pmx import PMX
-from pymoo.operators.mutation.inversion import InversionMutation
-from pymoo.operators.sampling.rnd import PermutationRandomSampling
 from pymoo.termination import get_termination
 from pymoo.util.ref_dirs import get_reference_directions
 
@@ -33,6 +33,64 @@ MACHINE_ORDER = [
     "DO-ČIŠČENJE",
     "DO-MEŠANJE",
 ]
+
+
+class PermutationRandomSampling(Sampling):
+    """Uniformly sample random job permutations."""
+
+    def _do(self, problem, n_samples, **kwargs):
+        n_vars = problem.n_var
+        pop = np.zeros((n_samples, n_vars), dtype=int)
+        for i in range(n_samples):
+            pop[i] = np.random.permutation(n_vars)
+        return pop
+
+
+class PMXCrossover(Crossover):
+    """Partially matched crossover for permutations."""
+
+    def __init__(self):
+        super().__init__(2, 2)
+
+    def _do(self, problem, X, **kwargs):
+        # X has shape (n_matings, 2, n_var)
+        n_matings, _, n_var = X.shape
+        children = np.empty_like(X)
+
+        for i in range(n_matings):
+            p1, p2 = X[i, 0].copy(), X[i, 1].copy()
+            c1, c2 = p1.copy(), p2.copy()
+
+            # choose crossover points
+            a, b = sorted(np.random.choice(n_var, 2, replace=False))
+
+            # mapping segments
+            c1[a:b], c2[a:b] = p2[a:b], p1[a:b]
+
+            def repair(child, donor_segment, parent_segment):
+                mapping = {d: s for d, s in zip(donor_segment, parent_segment)}
+                for idx in list(range(0, a)) + list(range(b, n_var)):
+                    while child[idx] in mapping:
+                        child[idx] = mapping[child[idx]]
+
+            repair(c1, p2[a:b], p1[a:b])
+            repair(c2, p1[a:b], p2[a:b])
+
+            children[i, 0], children[i, 1] = c1, c2
+
+        return children
+
+
+class InversionMutation(Mutation):
+    """Reverse a random subsequence within a permutation."""
+
+    def _do(self, problem, X, **kwargs):
+        X = X.copy()
+        n_individuals, n_var = X.shape
+        for i in range(n_individuals):
+            a, b = sorted(np.random.choice(n_var, 2, replace=False))
+            X[i, a:b] = X[i, a:b][::-1]
+        return X
 
 
 def load_jobs(path: Path) -> pd.DataFrame:
@@ -121,7 +179,7 @@ def configure_algorithms(problem: FlowShopProblem) -> Dict[str, object]:
 
     pop_size = 60
     sampling = PermutationRandomSampling()
-    crossover = PMX()
+    crossover = PMXCrossover()
     mutation = InversionMutation()
 
     ref_dirs = get_reference_directions("das-dennis", problem.n_obj, n_partitions=12)
