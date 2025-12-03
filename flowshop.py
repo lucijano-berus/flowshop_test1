@@ -174,6 +174,19 @@ class FlowShopProblem(ElementwiseProblem):
 
     def _evaluate(self, x: Iterable[int], out: Dict, *args, **kwargs) -> None:
         permutation = np.array(x, dtype=int)
+
+        # Guard against malformed individuals (e.g., values outside bounds or
+        # duplicate/missing jobs) by converting the raw vector into a valid
+        # permutation of job indices. If the candidate already represents a
+        # proper permutation it is left unchanged; otherwise its ranking order
+        # is used to derive a feasible permutation.
+        if (
+            len(permutation) != self.n_var
+            or np.any(permutation < 0)
+            or np.any(permutation >= self.n_var)
+            or len(np.unique(permutation)) != self.n_var
+        ):
+            permutation = np.argsort(permutation)
         _, _, makespan, completion_sum, idle_time = evaluate_permutation(
             permutation, self.processing_times
         )
